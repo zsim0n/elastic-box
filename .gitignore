@@ -1,0 +1,9 @@
+.vagrant
+.idea
+/puppet/modules/
+/puppet/.tmp
+Puppetfile.lock
+*DS_STORE
+*.csv
+_save
+kibana/
