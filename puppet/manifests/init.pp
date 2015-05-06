@@ -1,4 +1,10 @@
-# Update APT Cache
+Exec {
+  path => ['/bin', '/sbin', '/usr/bin', '/usr/sbin', '/usr/local/bin'],
+}
+
+Package {
+  ensure => 'present',
+}
 
 class { 'apt':
   update => {
@@ -8,19 +14,23 @@ class { 'apt':
 
 exec { 'apt-get update':
   command => '/usr/bin/apt-get update -y',
-  before  => [ Class['logstash'] ],
 }
 
-#file { '/home/vagrant/elasticsearch':
-#  ensure => 'directory',
-#  group  => 'vagrant',
-#  owner  => 'vagrant',
-#}
+# dotfiles
+
+exec { 'dotfiles':
+  command => '/usr/bin/git clone https://github.com/zsim0n/dotfiles.git && cd /home/vagrant/dotfiles && chmod +x ./bootstrap.sh && ./bootstrap.sh -f && rm -Rf /home/vagrant/dotfiles',
+  cwd  => '/home/vagrant',
+  user => 'vagrant',
+  require => Exec['apt-get update']
+}
+
 
 # Java is required
 class { 'java': }
 
 # Elasticsearch
+
 class { 'elasticsearch':
   manage_repo  => true,
   repo_version => '1.5',
@@ -34,7 +44,7 @@ elasticsearch::instance { 'es-01':
   'network.host' => '0.0.0.0'
   },        # Configuration hash
   init_defaults => { }, # Init defaults hash
-  before => Exec['start kibana']
+  before => Exec['kibana-start']
 }
 
 elasticsearch::plugin{'royrusso/elasticsearch-HQ':
@@ -43,17 +53,25 @@ elasticsearch::plugin{'royrusso/elasticsearch-HQ':
 }
 
 # Logstash
+
 class { 'logstash':
 #  autoupgrade  => true,
   ensure       => 'present',
   manage_repo  => true,
   repo_version => '1.4',
-  require      => [ Class['java'], Class['elasticsearch'] ],
+  status => 'disabled',
+  require      => [ Class['java'], Class['elasticsearch']],
 }
 
-file { '/etc/logstash/conf.d/logstash':
-  ensure  => '/vagrant/confs/logstash/logstash.conf',
-  require => [ Class['logstash'] ],
+
+file { '/etc/profile.d/logstash-path.sh':
+    mode    => 644,
+    content => 'PATH=$PATH:/opt/logstash/bin',
+    require => Class['logstash'],
+}
+
+# Kibana
+package { 'curl':
 }
 
 file { '/home/vagrant/kibana':
@@ -62,32 +80,36 @@ file { '/home/vagrant/kibana':
   owner  => 'vagrant',
 }
 
-package { 'curl':
-  ensure  => 'present',
-  require => [ Class['apt'] ],
-}
-
-exec { 'download_kibana':
-
+exec { 'kibana-download':
   command => '/usr/bin/curl -L https://download.elasticsearch.org/kibana/kibana/kibana-4.0.2-linux-x64.tar.gz | /bin/tar xvz -C /home/vagrant/kibana',
   require => [ Package['curl'], File['/home/vagrant/kibana'],Class['elasticsearch'] ],
   timeout     => 1800
 }
 
-exec {'start kibana':
+exec {'kibana-start':
   command => '/bin/sleep 10 && /home/vagrant/kibana/kibana-4.0.2-linux-x64/bin/kibana & ',
-  require => [ Exec['download_kibana']]
+  require => [ Exec['kibana-download']]
 }
 
-# dotfiles
+# nodejs
+$npm_packages = ['yo', 'serve','bower','grunt-cli']
 
-exec { 'dotfiles':
-  command => '/usr/bin/git clone https://github.com/zsim0n/dotfiles.git && cd /home/vagrant/dotfiles && chmod +x ./bootstrap.sh && ./bootstrap.sh -f && rm -Rf /home/vagrant/dotfiles',
-  cwd  => '/home/vagrant',
-  user => 'vagrant',
-}
-
-file { '/etc/profile.d/logstash-path.sh':
-    mode    => 644,
-    content => 'PATH=$PATH:/opt/logstash/bin',
+exec {'nodejs-setup': 
+  command => '/usr/bin/curl -sL https://deb.nodesource.com/setup_0.12 | sudo bash -',
+  require => Exec['apt-get update']
+}->
+package { 'nodejs' :
+}->
+exec { 'nodejs-post-install':
+  command => 'npm install -g npm && sudo npm -g config set prefix /home/vagrant/npm',
+}->
+file { '/etc/profile.d/nodejs-path.sh' :
+  ensure  => present,
+  mode    => 644,
+  content => template('/vagrant/puppet/templates/nodejs-path.sh.erb'),
+  owner   => 'vagrant',
+  group   => 'vagrant',
+}->
+package { $npm_packages:
+  provider => 'npm',
 }
