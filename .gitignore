@@ -7,3 +7,5 @@ Puppetfile.lock
 *.csv
 _save
 kibana/
+*.box
+/data/

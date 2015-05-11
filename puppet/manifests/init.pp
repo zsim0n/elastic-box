@@ -94,22 +94,8 @@ exec {'kibana-start':
 # nodejs
 $npm_packages = ['yo', 'serve','bower','grunt-cli']
 
-exec {'nodejs-setup': 
-  command => '/usr/bin/curl -sL https://deb.nodesource.com/setup_0.12 | sudo bash -',
-  require => Exec['apt-get update']
-}->
-package { 'nodejs' :
-}->
-exec { 'nodejs-post-install':
-  command => 'npm install -g npm && sudo npm -g config set prefix /home/vagrant/npm',
-}->
-file { '/etc/profile.d/nodejs-path.sh' :
-  ensure  => present,
-  mode    => 644,
-  content => template('/vagrant/puppet/templates/nodejs-path.sh.erb'),
-  owner   => 'vagrant',
-  group   => 'vagrant',
-}->
+class {'nodejs': 
+} ->
 package { $npm_packages:
   provider => 'npm',
 }
