@@ -16,6 +16,13 @@ exec { 'apt-get update':
   command => '/usr/bin/apt-get update -y',
 }
 
+# ensure base packages
+$packages = ['build-essential', 'keychain', 'git','curl', 'libxml2', 'libxml2-dev', 'libxslt1-dev', 'pwgen']
+
+package { $packages:
+  require => Exec['apt-get update'],
+}
+
 # dotfiles
 
 exec { 'dotfiles':
@@ -71,8 +78,6 @@ file { '/etc/profile.d/logstash-path.sh':
 }
 
 # Kibana
-package { 'curl':
-}
 
 file { '/home/vagrant/kibana':
   ensure => 'directory',
@@ -91,11 +96,3 @@ exec {'kibana-start':
   require => [ Exec['kibana-download']]
 }
 
-# nodejs
-$npm_packages = ['yo', 'serve','bower','grunt-cli']
-
-class {'nodejs': 
-} ->
-package { $npm_packages:
-  provider => 'npm',
-}
