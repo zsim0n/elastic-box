@@ -96,3 +96,12 @@ exec {'kibana-start':
   require => [ Exec['kibana-download']]
 }
 
+# nodejs
+$npm_packages = ['yo', 'serve','bower','grunt-cli']
+
+class {'nodejs': 
+} ->
+package { $npm_packages:
+  provider => 'npm',
+}
+
